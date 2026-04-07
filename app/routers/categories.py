@@ -5,8 +5,9 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app import models, schemas
+from app import schemas
 from app.database import get_db
+from app.repositories.categories import CategoryRepository
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
 
@@ -16,16 +17,15 @@ router = APIRouter(prefix="/categories", tags=["Categories"])
 def list_categories(skip: int = 0, limit: int = 20,
                     db: Session = Depends(get_db)):
     """Вернуть список всех категорий."""
-    return db.query(models.Category).offset(skip).limit(limit).all()
+    return CategoryRepository(db).get_all(skip=skip, limit=limit)
 
 
 @router.get("/{category_id}", response_model=schemas.CategoryOut,
             summary="Получить категорию")
 def get_category(category_id: int, db: Session = Depends(get_db)):
     """Вернуть категорию по ID."""
-    category = db.query(models.Category).filter(
-        models.Category.id == category_id
-    ).first()
+    repo = CategoryRepository(db)
+    category = repo.get_by_id(category_id)
     if not category:
         raise HTTPException(status_code=404, detail="Категория не найдена")
     return category
@@ -37,16 +37,11 @@ def get_category(category_id: int, db: Session = Depends(get_db)):
 def create_category(payload: schemas.CategoryCreate,
                     db: Session = Depends(get_db)):
     """Создать новую категорию."""
-    if db.query(models.Category).filter(
-        models.Category.slug == payload.slug
-    ).first():
+    repo = CategoryRepository(db)
+    if repo.get_by_slug(payload.slug):
         raise HTTPException(status_code=400,
                             detail="Категория с таким slug уже существует")
-    category = models.Category(**payload.model_dump())
-    db.add(category)
-    db.commit()
-    db.refresh(category)
-    return category
+    return repo.create(payload.model_dump())
 
 
 @router.put("/{category_id}", response_model=schemas.CategoryOut,
@@ -54,26 +49,19 @@ def create_category(payload: schemas.CategoryCreate,
 def update_category(category_id: int, payload: schemas.CategoryUpdate,
                     db: Session = Depends(get_db)):
     """Частично обновить категорию."""
-    category = db.query(models.Category).filter(
-        models.Category.id == category_id
-    ).first()
+    repo = CategoryRepository(db)
+    category = repo.get_by_id(category_id)
     if not category:
         raise HTTPException(status_code=404, detail="Категория не найдена")
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(category, field, value)
-    db.commit()
-    db.refresh(category)
-    return category
+    return repo.update(category, payload.model_dump(exclude_unset=True))
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT,
                summary="Удалить категорию")
 def delete_category(category_id: int, db: Session = Depends(get_db)):
     """Удалить категорию по ID."""
-    category = db.query(models.Category).filter(
-        models.Category.id == category_id
-    ).first()
+    repo = CategoryRepository(db)
+    category = repo.get_by_id(category_id)
     if not category:
         raise HTTPException(status_code=404, detail="Категория не найдена")
-    db.delete(category)
-    db.commit()
+    repo.delete(category)

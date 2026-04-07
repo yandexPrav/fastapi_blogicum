@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 
+# SQLite database imported from Django project.
 SQLALCHEMY_DATABASE_URL = "sqlite:///./blogicum.db"
 
 engine = create_engine(

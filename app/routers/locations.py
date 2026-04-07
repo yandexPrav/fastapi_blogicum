@@ -5,8 +5,9 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app import models, schemas
+from app import schemas
 from app.database import get_db
+from app.repositories.locations import LocationRepository
 
 router = APIRouter(prefix="/locations", tags=["Locations"])
 
@@ -16,16 +17,15 @@ router = APIRouter(prefix="/locations", tags=["Locations"])
 def list_locations(skip: int = 0, limit: int = 20,
                    db: Session = Depends(get_db)):
     """Вернуть список всех местоположений."""
-    return db.query(models.Location).offset(skip).limit(limit).all()
+    return LocationRepository(db).get_all(skip=skip, limit=limit)
 
 
 @router.get("/{location_id}", response_model=schemas.LocationOut,
             summary="Получить местоположение")
 def get_location(location_id: int, db: Session = Depends(get_db)):
     """Вернуть местоположение по ID."""
-    location = db.query(models.Location).filter(
-        models.Location.id == location_id
-    ).first()
+    repo = LocationRepository(db)
+    location = repo.get_by_id(location_id)
     if not location:
         raise HTTPException(status_code=404,
                             detail="Местоположение не найдено")
@@ -38,11 +38,7 @@ def get_location(location_id: int, db: Session = Depends(get_db)):
 def create_location(payload: schemas.LocationCreate,
                     db: Session = Depends(get_db)):
     """Создать новое местоположение."""
-    location = models.Location(**payload.model_dump())
-    db.add(location)
-    db.commit()
-    db.refresh(location)
-    return location
+    return LocationRepository(db).create(payload.model_dump())
 
 
 @router.put("/{location_id}", response_model=schemas.LocationOut,
@@ -50,28 +46,21 @@ def create_location(payload: schemas.LocationCreate,
 def update_location(location_id: int, payload: schemas.LocationUpdate,
                     db: Session = Depends(get_db)):
     """Частично обновить местоположение."""
-    location = db.query(models.Location).filter(
-        models.Location.id == location_id
-    ).first()
+    repo = LocationRepository(db)
+    location = repo.get_by_id(location_id)
     if not location:
         raise HTTPException(status_code=404,
                             detail="Местоположение не найдено")
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(location, field, value)
-    db.commit()
-    db.refresh(location)
-    return location
+    return repo.update(location, payload.model_dump(exclude_unset=True))
 
 
 @router.delete("/{location_id}", status_code=status.HTTP_204_NO_CONTENT,
                summary="Удалить местоположение")
 def delete_location(location_id: int, db: Session = Depends(get_db)):
     """Удалить местоположение по ID."""
-    location = db.query(models.Location).filter(
-        models.Location.id == location_id
-    ).first()
+    repo = LocationRepository(db)
+    location = repo.get_by_id(location_id)
     if not location:
         raise HTTPException(status_code=404,
                             detail="Местоположение не найдено")
-    db.delete(location)
-    db.commit()
+    repo.delete(location)

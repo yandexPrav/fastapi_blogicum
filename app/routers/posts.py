@@ -3,10 +3,12 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
-from app import models, schemas
+from app import schemas
 from app.database import get_db
+from app.repositories.posts import PostRepository
+from app.repositories.users import UserRepository
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
 
@@ -20,27 +22,16 @@ def list_posts(
     db: Session = Depends(get_db),
 ):
     """Вернуть список публикаций. При published_only=true — только опубликованные."""
-    query = db.query(models.Post)
-    if published_only:
-        query = query.filter(models.Post.is_published.is_(True))
-    return query.order_by(models.Post.pub_date.desc()).offset(skip).limit(limit).all()
+    return PostRepository(db).get_all(
+        skip=skip, limit=limit, published_only=published_only
+    )
 
 
 @router.get("/{post_id}", response_model=schemas.PostDetail,
             summary="Получить публикацию")
 def get_post(post_id: int, db: Session = Depends(get_db)):
     """Вернуть публикацию по ID со связанными автором, категорией, местом и комментариями."""
-    post = (
-        db.query(models.Post)
-        .options(
-            joinedload(models.Post.author),
-            joinedload(models.Post.category),
-            joinedload(models.Post.location),
-            joinedload(models.Post.comments),
-        )
-        .filter(models.Post.id == post_id)
-        .first()
-    )
+    post = PostRepository(db).get_detailed_by_id(post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Публикация не найдена")
     return post
@@ -52,17 +43,10 @@ def get_post(post_id: int, db: Session = Depends(get_db)):
 def create_post(payload: schemas.PostCreate, db: Session = Depends(get_db)):
     """Создать новую публикацию."""
     # Проверяем существование автора
-    author = db.query(models.User).filter(
-        models.User.id == payload.author_id
-    ).first()
+    author = UserRepository(db).get_by_id(payload.author_id)
     if not author:
         raise HTTPException(status_code=404, detail="Автор не найден")
-
-    post = models.Post(**payload.model_dump())
-    db.add(post)
-    db.commit()
-    db.refresh(post)
-    return post
+    return PostRepository(db).create(payload.model_dump())
 
 
 @router.put("/{post_id}", response_model=schemas.PostOut,
@@ -70,22 +54,19 @@ def create_post(payload: schemas.PostCreate, db: Session = Depends(get_db)):
 def update_post(post_id: int, payload: schemas.PostUpdate,
                 db: Session = Depends(get_db)):
     """Частично обновить публикацию."""
-    post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    repo = PostRepository(db)
+    post = repo.get_by_id(post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Публикация не найдена")
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(post, field, value)
-    db.commit()
-    db.refresh(post)
-    return post
+    return repo.update(post, payload.model_dump(exclude_unset=True))
 
 
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT,
                summary="Удалить публикацию")
 def delete_post(post_id: int, db: Session = Depends(get_db)):
     """Удалить публикацию по ID (комментарии удаляются каскадно)."""
-    post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    repo = PostRepository(db)
+    post = repo.get_by_id(post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Публикация не найдена")
-    db.delete(post)
-    db.commit()
+    repo.delete(post)
