@@ -34,3 +34,17 @@ uvicorn app.main:app --reload
 - [Pydantic v2](https://docs.pydantic.dev/) — валидация данных
 - [Uvicorn](https://www.uvicorn.org/) — ASGI-сервер
 - SQLite — база данных (файл `blogicum.db` создаётся автоматически)
+- [Alembic](https://alembic.sqlalchemy.org/) — миграции базы данных
+
+## Миграции Alembic
+
+```bash
+# создать пустую SQLite базу для миграций
+touch empty_blogicum.db
+
+# сгенерировать миграцию по текущим моделям
+alembic revision --autogenerate -m "create all tables"
+
+# применить миграции
+alembic upgrade head
+```
