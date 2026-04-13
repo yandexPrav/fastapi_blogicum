@@ -3,6 +3,7 @@
 from sqlalchemy.orm import Session
 
 from app import models
+from app.repositories.utils import db_call
 
 
 class CategoryRepository:
@@ -12,33 +13,50 @@ class CategoryRepository:
         self.db = db
 
     def get_all(self, skip: int = 0, limit: int = 20):
-        return self.db.query(models.Category).offset(skip).limit(limit).all()
+        return db_call(
+            "categories.get_all",
+            lambda: self.db.query(models.Category).offset(skip).limit(limit).all(),
+        )
 
     def get_by_id(self, category_id: int):
-        return (
-            self.db.query(models.Category)
+        return db_call(
+            "categories.get_by_id",
+            lambda: self.db.query(models.Category)
             .filter(models.Category.id == category_id)
-            .first()
+            .first(),
         )
 
     def get_by_slug(self, slug: str):
-        return self.db.query(models.Category).filter(models.Category.slug == slug).first()
+        return db_call(
+            "categories.get_by_slug",
+            lambda: self.db.query(models.Category)
+            .filter(models.Category.slug == slug)
+            .first(),
+        )
 
     def create(self, payload):
-        category = models.Category(**payload)
-        self.db.add(category)
-        self.db.commit()
-        self.db.refresh(category)
-        return category
+        def _create():
+            category = models.Category(**payload)
+            self.db.add(category)
+            self.db.commit()
+            self.db.refresh(category)
+            return category
+
+        return db_call("categories.create", _create)
 
     def update(self, category: models.Category, payload):
-        for field, value in payload.items():
-            setattr(category, field, value)
-        self.db.commit()
-        self.db.refresh(category)
-        return category
+        def _update():
+            for field, value in payload.items():
+                setattr(category, field, value)
+            self.db.commit()
+            self.db.refresh(category)
+            return category
+
+        return db_call("categories.update", _update)
 
     def delete(self, category: models.Category):
-        self.db.delete(category)
-        self.db.commit()
+        return db_call(
+            "categories.delete",
+            lambda: (self.db.delete(category), self.db.commit()),
+        )
 

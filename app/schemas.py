@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 # ─────────────────────────────── User ────────────────────────────────────────
@@ -15,9 +15,26 @@ class UserBase(BaseModel):
     last_name: str = ""
     bio: str = ""
 
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 3:
+            raise ValueError("username должен содержать минимум 3 символа")
+        if " " in value:
+            raise ValueError("username не должен содержать пробелы")
+        return value
+
 
 class UserCreate(UserBase):
     password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if len(value) < 8:
+            raise ValueError("password должен содержать минимум 8 символов")
+        return value
 
 
 class UserUpdate(BaseModel):
@@ -44,6 +61,24 @@ class CategoryBase(BaseModel):
     slug: str
     is_published: bool = True
 
+    @field_validator("title", "description")
+    @classmethod
+    def validate_text_fields(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("поле не может быть пустым")
+        return value.strip()
+
+    @field_validator("slug")
+    @classmethod
+    def validate_slug(cls, value: str) -> str:
+        allowed = "abcdefghijklmnopqrstuvwxyz0123456789-_"
+        cleaned = value.strip().lower()
+        if not cleaned:
+            raise ValueError("slug не может быть пустым")
+        if any(ch not in allowed for ch in cleaned):
+            raise ValueError("slug может содержать только [a-z0-9-_]")
+        return cleaned
+
 
 class CategoryCreate(CategoryBase):
     pass
@@ -69,6 +104,13 @@ class CategoryOut(CategoryBase):
 class LocationBase(BaseModel):
     name: str
     is_published: bool = True
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("name не может быть пустым")
+        return value.strip()
 
 
 class LocationCreate(LocationBase):
@@ -99,6 +141,13 @@ class PostBase(BaseModel):
     author_id: int
     location_id: Optional[int] = None
     category_id: Optional[int] = None
+
+    @field_validator("title", "text")
+    @classmethod
+    def validate_post_text_fields(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("поле не может быть пустым")
+        return value.strip()
 
 
 class PostCreate(PostBase):
@@ -139,6 +188,13 @@ class CommentBase(BaseModel):
     text: str
     post_id: int
     author_id: int
+
+    @field_validator("text")
+    @classmethod
+    def validate_comment_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("text комментария не может быть пустым")
+        return value.strip()
 
 
 class CommentCreate(CommentBase):

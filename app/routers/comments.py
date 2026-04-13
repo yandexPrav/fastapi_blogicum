@@ -2,14 +2,17 @@
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.api_errors import to_http_exception
 from app import schemas
 from app.database import get_db
+from app.errors import AppError
 from app.repositories.comments import CommentRepository
 from app.repositories.posts import PostRepository
 from app.repositories.users import UserRepository
+from app.use_cases.comments import CommentUseCase
 
 router = APIRouter(prefix="/comments", tags=["Comments"])
 
@@ -23,17 +26,26 @@ def list_comments(
     db: Session = Depends(get_db),
 ):
     """Вернуть список комментариев. Можно фильтровать по post_id."""
-    return CommentRepository(db).get_all(post_id=post_id, skip=skip, limit=limit)
+    try:
+        use_case = CommentUseCase(
+            CommentRepository(db), PostRepository(db), UserRepository(db)
+        )
+        return use_case.list_comments(post_id=post_id, skip=skip, limit=limit)
+    except AppError as exc:
+        raise to_http_exception(exc) from exc
 
 
 @router.get("/{comment_id}", response_model=schemas.CommentOut,
             summary="Получить комментарий")
 def get_comment(comment_id: int, db: Session = Depends(get_db)):
     """Вернуть комментарий по ID."""
-    comment = CommentRepository(db).get_by_id(comment_id)
-    if not comment:
-        raise HTTPException(status_code=404, detail="Комментарий не найден")
-    return comment
+    try:
+        use_case = CommentUseCase(
+            CommentRepository(db), PostRepository(db), UserRepository(db)
+        )
+        return use_case.get_comment(comment_id)
+    except AppError as exc:
+        raise to_http_exception(exc) from exc
 
 
 @router.post("/", response_model=schemas.CommentOut,
@@ -42,13 +54,13 @@ def get_comment(comment_id: int, db: Session = Depends(get_db)):
 def create_comment(payload: schemas.CommentCreate,
                    db: Session = Depends(get_db)):
     """Добавить комментарий к публикации."""
-    post = PostRepository(db).get_by_id(payload.post_id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Публикация не найдена")
-    author = UserRepository(db).get_by_id(payload.author_id)
-    if not author:
-        raise HTTPException(status_code=404, detail="Автор не найден")
-    return CommentRepository(db).create(payload.model_dump())
+    try:
+        use_case = CommentUseCase(
+            CommentRepository(db), PostRepository(db), UserRepository(db)
+        )
+        return use_case.create_comment(payload.model_dump())
+    except AppError as exc:
+        raise to_http_exception(exc) from exc
 
 
 @router.put("/{comment_id}", response_model=schemas.CommentOut,
@@ -56,19 +68,23 @@ def create_comment(payload: schemas.CommentCreate,
 def update_comment(comment_id: int, payload: schemas.CommentUpdate,
                    db: Session = Depends(get_db)):
     """Обновить текст комментария."""
-    repo = CommentRepository(db)
-    comment = repo.get_by_id(comment_id)
-    if not comment:
-        raise HTTPException(status_code=404, detail="Комментарий не найден")
-    return repo.update(comment, payload.model_dump(exclude_unset=True))
+    try:
+        use_case = CommentUseCase(
+            CommentRepository(db), PostRepository(db), UserRepository(db)
+        )
+        return use_case.update_comment(comment_id, payload.model_dump(exclude_unset=True))
+    except AppError as exc:
+        raise to_http_exception(exc) from exc
 
 
 @router.delete("/{comment_id}", status_code=status.HTTP_204_NO_CONTENT,
                summary="Удалить комментарий")
 def delete_comment(comment_id: int, db: Session = Depends(get_db)):
     """Удалить комментарий по ID."""
-    repo = CommentRepository(db)
-    comment = repo.get_by_id(comment_id)
-    if not comment:
-        raise HTTPException(status_code=404, detail="Комментарий не найден")
-    repo.delete(comment)
+    try:
+        use_case = CommentUseCase(
+            CommentRepository(db), PostRepository(db), UserRepository(db)
+        )
+        use_case.delete_comment(comment_id)
+    except AppError as exc:
+        raise to_http_exception(exc) from exc
