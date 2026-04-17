@@ -5,6 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user, get_password_hash
 from app.api_errors import to_http_exception
 from app.errors import AppError
 from app import schemas
@@ -16,7 +17,8 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.get("/", response_model=List[schemas.UserOut], summary="Список пользователей")
-def list_users(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
+def list_users(skip: int = 0, limit: int = 20, db: Session = Depends(get_db),
+               _: object = Depends(get_current_user)):
     """Вернуть список всех пользователей."""
     try:
         return UserUseCase(UserRepository(db)).list_users(skip=skip, limit=limit)
@@ -25,7 +27,8 @@ def list_users(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}", response_model=schemas.UserOut, summary="Получить пользователя")
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(user_id: int, db: Session = Depends(get_db),
+             _: object = Depends(get_current_user)):
     """Вернуть пользователя по ID."""
     try:
         return UserUseCase(UserRepository(db)).get_user(user_id)
@@ -44,7 +47,7 @@ def create_user(payload: schemas.UserCreate, db: Session = Depends(get_db)):
             "first_name": payload.first_name,
             "last_name": payload.last_name,
             "bio": payload.bio,
-            "hashed_password": f"hashed_{payload.password}",
+            "hashed_password": get_password_hash(payload.password),
         }
         return UserUseCase(UserRepository(db)).create_user(user_payload)
     except AppError as exc:
@@ -53,7 +56,8 @@ def create_user(payload: schemas.UserCreate, db: Session = Depends(get_db)):
 
 @router.put("/{user_id}", response_model=schemas.UserOut, summary="Обновить пользователя")
 def update_user(user_id: int, payload: schemas.UserUpdate,
-                db: Session = Depends(get_db)):
+                db: Session = Depends(get_db),
+                _: object = Depends(get_current_user)):
     """Частично обновить данные пользователя."""
     try:
         update_data = payload.model_dump(exclude_unset=True)
@@ -64,7 +68,8 @@ def update_user(user_id: int, payload: schemas.UserUpdate,
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT,
                summary="Удалить пользователя")
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(user_id: int, db: Session = Depends(get_db),
+                _: object = Depends(get_current_user)):
     """Удалить пользователя по ID."""
     try:
         UserUseCase(UserRepository(db)).delete_user(user_id)

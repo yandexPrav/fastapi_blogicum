@@ -215,3 +215,8 @@ class CommentOut(CommentBase):
 
 # Resolve forward reference
 PostDetail.model_rebuild()
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str

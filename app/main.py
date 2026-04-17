@@ -11,7 +11,7 @@ FastAPI Blogicum — рефакторинг Django-проекта (блогicum,
 
 from fastapi import FastAPI
 
-from app.routers import categories, comments, locations, posts, users
+from app.routers import auth, categories, comments, locations, posts, users
 
 app = FastAPI(
     title="Blogicum API",
@@ -24,6 +24,7 @@ app = FastAPI(
 
 # Подключаем роутеры
 app.include_router(users.router)
+app.include_router(auth.router)
 app.include_router(categories.router)
 app.include_router(locations.router)
 app.include_router(posts.router)

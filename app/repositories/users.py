@@ -33,6 +33,14 @@ class UserRepository:
             ).first(),
         )
 
+    def get_by_username(self, username: str):
+        return db_call(
+            "users.get_by_username",
+            lambda: self.db.query(models.User)
+            .filter(models.User.username == username)
+            .first(),
+        )
+
     def create(self, payload):
         def _create():
             user = models.User(**payload)

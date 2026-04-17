@@ -5,6 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.api_errors import to_http_exception
 from app import schemas
 from app.database import get_db
@@ -13,7 +14,11 @@ from app.repositories.posts import PostRepository
 from app.repositories.users import UserRepository
 from app.use_cases.posts import PostUseCase
 
-router = APIRouter(prefix="/posts", tags=["Posts"])
+router = APIRouter(
+    prefix="/posts",
+    tags=["Posts"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.get("/", response_model=List[schemas.PostOut],
