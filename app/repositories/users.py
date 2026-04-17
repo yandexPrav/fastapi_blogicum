@@ -1,11 +1,26 @@
 """User repository."""
 
+from pydantic import BaseModel, ValidationError, field_validator
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app import models
+from app.errors import InfrastructureError
 from app.repositories.utils import db_call
 
+
+class UserCreatePayload(BaseModel):
+    """Целевая проверка pydantic предназначена только для создания полезной нагрузки."""
+
+    username: str
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        cleaned = value.strip()
+        if len(cleaned) < 3:
+            raise ValueError("username должен содержать минимум 3 символа")
+        return cleaned
 
 class UserRepository:
     """Repository for user CRUD operations."""
@@ -42,7 +57,16 @@ class UserRepository:
         )
 
     def create(self, payload):
+        try:
+            validated_create = UserCreatePayload.model_validate(payload)
+        except ValidationError as exc:
+            raise InfrastructureError(
+                "Ошибка валидации payload для создания пользователя",
+                details={"operation": "users.create", "errors": exc.errors()},
+            ) from exc
+
         def _create():
+            payload["username"] = validated_create.username
             user = models.User(**payload)
             self.db.add(user)
             self.db.commit()

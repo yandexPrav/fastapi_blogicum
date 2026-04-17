@@ -3,7 +3,8 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
 
 # ─────────────────────────────── User ────────────────────────────────────────
@@ -28,12 +29,22 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    age: Optional[int] = None
 
     @field_validator("password")
     @classmethod
     def validate_password(cls, value: str) -> str:
         if len(value) < 8:
             raise ValueError("password должен содержать минимум 8 символов")
+        return value
+
+    @field_validator("age")
+    @classmethod
+    def validate_age(cls, value: Optional[int]) -> Optional[int]:
+        if value is None:
+            return value
+        if value < 14:
+            raise ValueError("Возраст должен быть не меньше 14 лет")
         return value
 
 
@@ -81,7 +92,16 @@ class CategoryBase(BaseModel):
 
 
 class CategoryCreate(CategoryBase):
-    pass
+    @model_validator(mode="after")
+    def validate_category_business_rules(self):
+        # Custom pydantic validation specifically for Category creation.
+        normalized_title = self.title.strip().lower().replace(" ", "-")
+        if self.slug == normalized_title:
+            raise PydanticCustomError(
+                "category_slug_matches_title",
+                "slug не должен полностью совпадать с title",
+            )
+        return self
 
 
 class CategoryUpdate(BaseModel):
