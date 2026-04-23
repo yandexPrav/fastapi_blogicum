@@ -1,4 +1,4 @@
-"""Authentication and authorization helpers (JWT)."""
+"""Авторизация JWT)."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -8,31 +8,32 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.repositories.users import UserRepository
 
-SECRET_KEY = "change_me_for_production_super_secret_key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+SECRET_KEY = settings.secret_key
+ALGORITHM = settings.algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password for both bcrypt and legacy stub format."""
+    """Подтвердите пароль для bcrypt и устаревшего формата stub."""
     if hashed_password.startswith("hashed_"):
         return hashed_password == f"hashed_{plain_password}"
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
-    """Hash plain password with bcrypt."""
+    """Хеширование обычного пароля с помощью bcrypt."""
     return pwd_context.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
-    """Create signed JWT access token."""
+    """Создание подвержденого токена JWT."""
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -42,7 +43,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 
 def authenticate_user(db: Session, username: str, password: str):
-    """Authenticate user by username and password."""
+    """Аутентификация пороля и пользователя."""
     user = UserRepository(db).get_by_username(username)
     if not user:
         return None
@@ -55,7 +56,7 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ):
-    """Extract and return current user from JWT token."""
+    """Извлечение и возврат данных текущего пользователя из JWT-токена."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Не удалось проверить учетные данные",

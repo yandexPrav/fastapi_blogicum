@@ -1,12 +1,11 @@
-import os
+"""Подключение к БД и фабрика сессий SQLAlchemy."""
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL", "sqlite:///./blogicum.db"
-)
+from app.config import settings
+
+SQLALCHEMY_DATABASE_URL = settings.database_url
 
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
     engine = create_engine(
@@ -14,7 +13,7 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
         connect_args={"check_same_thread": False},
     )
 else:
-    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+    engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -22,6 +21,7 @@ Base = declarative_base()
 
 
 def get_db():
+    """Yield сессию БД с гарантированным закрытием."""
     db = SessionLocal()
     try:
         yield db

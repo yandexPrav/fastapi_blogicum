@@ -1,4 +1,4 @@
-"""SQLAlchemy models based on Django blogicum models (up to sprint 8)."""
+"""SQLAlchemy models based on Django blogicum models."""
 
 from datetime import datetime
 
